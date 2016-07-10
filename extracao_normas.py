@@ -1,5 +1,9 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
+# encoding: utf-8
+# encoding: iso-8859-1
+# encoding: win-1252
+
 
 #------------------------------------------------------------------
 #	Recuperação de informações de Normas do CMN e do BC 
@@ -23,6 +27,9 @@ from unicodedata import normalize
 # Trabalhar com datas
 from datetime import date
 
+# Gerar csv
+import csv
+
 # Manipulação e parsing de html
 from HTMLParser import HTMLParser
 from htmlentitydefs import name2codepoint
@@ -33,7 +40,7 @@ from bs4 import BeautifulSoup
 
 #-------------------------------------------------------------------------
 def ajustaArray(string):
-	string = string.replace("\xba", "")
+	#string = string.replace("\xba", "")
 	string = string.replace("\xc0", "A")
         string = string.replace("\xc1", "A")
         string = string.replace("\xc2", "A")
@@ -91,12 +98,22 @@ have_page = True
 driver = webdriver.Firefox()
 
 # Url a ser utilizada
-url = 'http://www.bcb.gov.br/pre/normativos/busca/buscaNormativo.asp?tema=&startRow=0&refinadorTipo=&refinadorRevogado=&tipo=P&tipoDocumento=0&numero=&conteudo=&dataInicioBusca=19%2F6%2F2016&dataFimBusca=22%2F6%2F2016'
+url = 'http://www.bcb.gov.br/pre/normativos/busca/buscaNormativo.asp?tema=&startRow=0&refinadorTipo=&refinadorRevogado=&tipo=P&tipoDocumento=0&numero=&conteudo=&dataInicioBusca=13%2F1%2F2012&dataFimBusca=22%2F6%2F2016'
+url = 'http://www.bcb.gov.br/pre/normativos/busca/buscaNormativo.asp?tema=&startRow=0&refinadorTipo=&refinadorRevogado=&tipo=P&tipoDocumento=0&numero=&conteudo=&dataInicioBusca=19%2F6%2F1940&dataFimBusca=11%2F1%2F2012'
+url = 'http://www.bcb.gov.br/pre/normativos/busca/buscaNormativo.asp?tema=&startRow=0&refinadorTipo=&refinadorRevogado=&tipo=P&tipoDocumento=0&numero=&conteudo=&dataInicioBusca=19%2F6%2F1940&dataFimBusca=4%2F3%2F2010'
+url = 'http://www.bcb.gov.br/pre/normativos/busca/buscaNormativo.asp?tema=&startRow=0&refinadorTipo=&refinadorRevogado=&tipo=P&tipoDocumento=0&numero=&conteudo=&dataInicioBusca=12%2F6%2F2012&dataFimBusca=06%2F7%2F2016'
 
 # Acessar a página 
 driver.get(url)
 
 # XXX: Fazer a finalização da última página, esta rodando conforme while 1
+
+
+# Dia de hoje
+now = date.today()
+
+# Criando arquivo csv
+print("Título;Link;Data/Hora Documento;Assunto;Responsável;DataInserção")
 
 while (have_page):
 	# Aguardar o carregamento do ajax - 10 segundos para garantir o carregamento total
@@ -116,21 +133,76 @@ while (have_page):
 	lis = lis.find('div', attrs={'class': 'encontrados'})
 	lis = lis.find('ol').findAll('li')
 
+
 	for li in lis:
-		link = (li.find('a').text)
+		# Inicializando assunto
+		assunto = {}
+		dataHoraDocts = {}
+
+		string = (li.text).encode('utf-8')
+		link = "http://www.bcb.gov.br"+(li.find('a'))['href']
 		titulo = li.find('a').text
-		#dataHoraDocts = ajustaArray(str(li.text)).split("<br>")[1]
-		#assunto = ajustaArray(str(li.text)).split("<br>")[2]
-		#responsavel = ajustaArray(str(li.text)).split("<br>")[3]
+		#re.findall('<!--(.*?)-->', string, re.DOTALL)
+		
+		try:
+			dataHoraDocts = re.findall('Documento:(.*?)Assunto:', string, re.DOTALL)
+		except Exception:
+			'null'
+		try:
+			if not dataHoraDocts:
+				dataHoraDocts = re.findall('Documento:(.*?)Resumo:', string, re.DOTALL)
+		except Exception:
+			'null'
+		
+		if not dataHoraDocts:
+			dataHoraDocts = {}
+			dataHoraDocts[0] = '****** ERROR: VER ESSA ENTRADA *******'
 
-		print '--------------------------------------------------'
-		print li.text
-		print titulo
-		print link
-		#print dataHoraDocts
-		#print assunto
-		#print responsavel
 
+		try:
+			assunto = re.findall('Assunto:(.*?)Responsável:', string, re.DOTALL)
+		except Exception:
+			'null'
+		try:
+			if not assunto:
+				assunto = re.findall('Resumo:(.*?)Responsável:', string, re.DOTALL)
+		except Exception:
+			'null'
+	
+		if not assunto:
+			assunto = {}
+			assunto[0] = '****** ERROR: VER ESSA ENTRADA *******'
+		else:
+			# Retirar as quebras de linhas 
+			assunto[0] = assunto[0].replace(';', '.,')
+			assunto[0] = assunto[0].replace('\n', ' ')
+			assunto[0] = assunto[0].replace('     ', ' ') # 5 Espaços
+			assunto[0] = assunto[0].replace('    ', ' ') # 4 Espaços
+			assunto[0] = assunto[0].replace('   ', ' ') # 3 Espaços
+			assunto[0] = assunto[0].replace('  ', ' ') # 2 Espaços
+
+		responsavel = re.findall('Responsável:(.*?)$', string, re.DOTALL)
+
+		#print "'"+(li.text).encode('utf-8')+"'",
+		#print  ';',
+		print ""+titulo.encode('utf-8')+"",
+		print  ';',
+		print ""+link+"",
+		print  ';',
+		print ""+dataHoraDocts[0]+"",
+		print  ';',
+		print  ""+assunto[0].decode('utf-8')+"",
+		print  ';',
+		print  ""+responsavel[0]+"",
+		print  ';',
+		print ""+str(now).encode('utf-8')+""
+
+#		csv.writerow([ajustaArray(titulo.decode(encoding='UTF-8',errors='strict')),
+#				dataHoraDocts,
+#				ajustaArray(assunto.decode(encoding='UTF-8',errors='strict')),
+#				responsavel,
+#				link,now])
+		#csv.writerow(['%d','%d','%d','%d','%d','%d'])%(titulo,dataHoraDocts,assunto,responsável,link,now)
 
 	# ---------------------------------------------------
 
@@ -146,7 +218,7 @@ while (have_page):
 # Fechar navegador
 driver.close()
 
-print 'Todas as páginas foram listadas!!!'
+print ('Todas as páginas foram listadas!!!')
 
 
 
